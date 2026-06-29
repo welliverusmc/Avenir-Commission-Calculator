@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ACS Commission Calculator</title>
+<style>
+body{font-family:Arial,sans-serif;margin:0;background:#f2f2f2;padding-bottom:180px}
+header{background:#173f73;color:#fff;padding:18px;text-align:center}
+.section{background:#173f73;color:#fff;text-align:center;padding:10px;font-weight:bold;font-size:22px;margin-top:16px}
+.card{display:flex;justify-content:space-between;align-items:center;background:#fff;margin:10px;padding:12px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+.left b{font-size:20px}
+.controls{display:flex;align-items:center;gap:12px}
+button{width:42px;height:42px;border:none;border-radius:8px;background:#777;color:#fff;font-size:24px}
+.action{width:auto;padding:12px 20px;height:auto;margin:6px;background:#173f73}
+.footer{position:fixed;left:0;right:0;bottom:0;background:#fff;padding:12px;border-top:1px solid #ccc;text-align:center}
+.sale{background:#fff;margin:8px;padding:10px;border-radius:8px}
+</style>
+</head>
+<body>
+<header><h1>Avenir Consulting Solutions</h1><h2>AT&T Commission Calculator</h2></header>
+
+<div id="app"></div>
+
+<div class="footer">
+<h2>Total: <span id="total">$0.00</span></h2>
+<button class="action" onclick="saveSale()">Save Sale</button>
+<button class="action" onclick="clearCurrent()">Clear Current</button>
+<h3>Weekly Total: <span id="weekly">$0.00</span></h3>
+<div id="sales"></div>
+</div>
+
+<script>
+const sections={
+"Wireless":[["New Line",50],["Upgrade",20],["BYOD",35],["Next Up",10],["Extra",8],["Premium",11],["Individual Insurance",5],["Family Insurance",7]],
+"Internet":[["Internet AIR",50]],
+"Connected Devices":[["Watch",50],["Tablet",15]]
+};
+const state={};
+const root=document.getElementById("app");
+Object.entries(sections).forEach(([sec,items])=>{
+ root.innerHTML+=`<div class='section'>${sec}</div>`;
+ items.forEach(([n,v])=>{
+   state[n]=0;
+   const id=n.replace(/\W/g,"_");
+   const d=document.createElement("div");
+   d.className="card";
+   d.innerHTML=`<div class='left'><b>${n}</b><div>$${v}</div></div>
+   <div class='controls'><button>-</button><span id="${id}">0</span><button>+</button></div>`;
+   const b=d.querySelectorAll("button");
+   b[0].onclick=()=>chg(n,-1);
+   b[1].onclick=()=>chg(n,1);
+   root.appendChild(d);
+ });
+});
+function chg(n,a){state[n]=Math.max(0,state[n]+a);document.getElementById(n.replace(/\W/g,"_")).textContent=state[n];update();}
+function update(){let t=0;Object.values(sections).flat().forEach(([n,v])=>t+=state[n]*v);document.getElementById("total").textContent="$"+t.toFixed(2);}
+function clearCurrent(){Object.keys(state).forEach(n=>{state[n]=0;document.getElementById(n.replace(/\W/g,"_")).textContent=0});update();}
+function saveSale(){
+ let total=0,items=[];
+ Object.values(sections).flat().forEach(([n,v])=>{
+   if(state[n]>0){items.push(`${n} x${state[n]}`); total+=state[n]*v;}
+ });
+ if(total===0){alert("Nothing to save.");return;}
+ const sales=JSON.parse(localStorage.getItem("acsSales")||"[]");
+ sales.push({date:new Date().toLocaleString(),total,items});
+ localStorage.setItem("acsSales",JSON.stringify(sales));
+ clearCurrent();
+ renderSales();
+}
+function renderSales(){
+ const sales=JSON.parse(localStorage.getItem("acsSales")||"[]");
+ let week=0;
+ const box=document.getElementById("sales");
+ box.innerHTML="";
+ sales.forEach((s,i)=>{
+   week+=s.total;
+   const d=document.createElement("div");
+   d.className="sale";
+   d.innerHTML=`<b>Sale ${i+1}</b><br>${s.date}<br>${s.items.join(", ")}<br><b>$${s.total.toFixed(2)}</b>
+   <br><button class='action' onclick='delSale(${i})'>Delete</button>`;
+   box.appendChild(d);
+ });
+ document.getElementById("weekly").textContent="$"+week.toFixed(2);
+}
+function delSale(i){
+ const sales=JSON.parse(localStorage.getItem("acsSales")||"[]");
+ sales.splice(i,1);
+ localStorage.setItem("acsSales",JSON.stringify(sales));
+ renderSales();
+}
+renderSales();update();
+</script>
+</body>
+</html>
