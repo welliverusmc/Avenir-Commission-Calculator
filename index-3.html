@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACS Commission Calculator</title>
+<style>
+:root{--navy:#143d73;--gold:#b58a4a;--bg:#f3f3f3;--card:#fff;--muted:#555}
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;margin:0;background:var(--bg);padding-bottom:210px;color:#111}
+header{background:var(--navy);color:#fff;text-align:center;padding:24px 12px}
+header h1{margin:0 0 10px;font-size:30px}
+header h2{margin:0;font-size:22px}
+.section{background:var(--navy);color:#fff;text-align:center;padding:12px;margin-top:18px;font-size:24px;font-weight:bold}
+.card{display:flex;justify-content:space-between;align-items:center;background:var(--card);margin:10px 12px;padding:14px;border-radius:10px;box-shadow:0 2px 7px rgba(0,0,0,.16)}
+.name{font-size:22px;font-weight:bold}
+.pay{font-size:18px;color:#444}
+.controls{display:flex;align-items:center;gap:14px}
+.qty{font-size:22px;font-weight:bold;min-width:24px;text-align:center}
+button{border:none;border-radius:9px;background:#777;color:#fff;font-size:24px;font-weight:bold}
+.smallBtn{width:48px;height:48px}
+.footer{position:fixed;left:0;right:0;bottom:0;background:#fff;border-top:1px solid #ccc;padding:12px;text-align:center;box-shadow:0 -2px 8px rgba(0,0,0,.15)}
+.footer h2,.footer h3{margin:8px}
+.action{width:auto;padding:12px 20px;height:auto;margin:5px;font-size:20px;background:var(--navy)}
+.secondary{background:#777}
+.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:12px}
+.summary div{background:#fff;border-radius:10px;padding:12px;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.summary b{display:block;font-size:22px;color:var(--navy)}
+.savedTitle{padding:12px;margin-bottom:0}
+.sale{background:#fff;margin:10px 12px;padding:12px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.saleHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.saleTotal{font-size:22px;font-weight:bold;color:var(--navy)}
+.saleDetails{margin-top:8px;color:#333;line-height:1.5}
+.delete{background:#9b2c2c;font-size:16px;padding:9px 12px;width:auto;height:auto}
+.empty{margin:12px;color:#666;text-align:center}
+@media(max-width:520px){
+header h1{font-size:25px}header h2{font-size:20px}
+.name{font-size:20px}.pay{font-size:17px}
+.action{font-size:18px;padding:11px 14px}
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Avenir Consulting Solutions</h1>
+  <h2>AT&T Commission Calculator</h2>
+</header>
+
+<main id="app"></main>
+
+<h2 class="savedTitle">Weekly Sales Tracker</h2>
+<div class="summary">
+  <div><span>Sales</span><b id="salesCount">0</b></div>
+  <div><span>Units</span><b id="unitsCount">0</b></div>
+  <div><span>Average Sale</span><b id="avgSale">$0.00</b></div>
+  <div><span>Highest Sale</span><b id="highSale">$0.00</b></div>
+</div>
+<div id="sales"></div>
+
+<div class="footer">
+  <h2>Current Sale: <span id="current">$0.00</span></h2>
+  <h3>Weekly Total: <span id="weekly">$0.00</span></h3>
+  <button class="action" onclick="saveSale()">Save Sale</button>
+  <button class="action secondary" onclick="clearCurrent()">Clear Current</button>
+</div>
+
+<script>
+const categories={
+  "Wireless":[["New Line",50],["Upgrade",20],["BYOD",35],["Next Up",10],["Extra",8],["Premium",11],["Individual Insurance",5],["Family Insurance",7]],
+  "Internet":[["Internet AIR",50]],
+  "Connected Devices":[["Watch",50],["Tablet",15]]
+};
+
+let counts={};
+let sales=JSON.parse(localStorage.getItem("acsSalesDetailed")||"[]");
+const app=document.getElementById("app");
+
+function idFor(name){return name.replace(/[^a-zA-Z0-9]/g,"_");}
+
+for(const category in categories){
+  const section=document.createElement("div");
+  section.className="section";
+  section.textContent=category;
+  app.appendChild(section);
+
+  categories[category].forEach(([name,pay])=>{
+    counts[name]=0;
+    const card=document.createElement("div");
+    card.className="card";
+    card.innerHTML=`
+      <div>
+        <div class="name">${name}</div>
+        <div class="pay">$${pay}</div>
+      </div>
+      <div class="controls">
+        <button class="smallBtn" onclick="changeQty('${name}',-1)">-</button>
+        <span class="qty" id="${idFor(name)}">0</span>
+        <button class="smallBtn" onclick="changeQty('${name}',1)">+</button>
+      </div>`;
+    app.appendChild(card);
+  });
+}
+
+function changeQty(name,amount){
+  counts[name]=Math.max(0,counts[name]+amount);
+  document.getElementById(idFor(name)).textContent=counts[name];
+  updateCurrent();
+}
+
+function currentItems(){
+  const items=[];
+  for(const category in categories){
+    categories[category].forEach(([name,pay])=>{
+      const qty=counts[name]||0;
+      if(qty>0){items.push({name,qty,pay,subtotal:qty*pay});}
+    });
+  }
+  return items;
+}
+
+function currentTotal(){
+  return currentItems().reduce((sum,item)=>sum+item.subtotal,0);
+}
+
+function currentUnits(){
+  return currentItems().reduce((sum,item)=>sum+item.qty,0);
+}
+
+function updateCurrent(){
+  document.getElementById("current").textContent="$"+currentTotal().toFixed(2);
+}
+
+function clearCurrent(){
+  Object.keys(counts).forEach(name=>{
+    counts[name]=0;
+    document.getElementById(idFor(name)).textContent="0";
+  });
+  updateCurrent();
+}
+
+function saveSale(){
+  const items=currentItems();
+  const total=currentTotal();
+  if(total===0){alert("Add at least one item before saving a sale.");return;}
+
+  sales.unshift({
+    date:new Date().toLocaleString(),
+    total:total,
+    units:currentUnits(),
+    items:items
+  });
+
+  localStorage.setItem("acsSalesDetailed",JSON.stringify(sales));
+  clearCurrent();
+  renderSales();
+}
+
+function deleteSale(index){
+  if(!confirm("Delete this saved sale?"))return;
+  sales.splice(index,1);
+  localStorage.setItem("acsSalesDetailed",JSON.stringify(sales));
+  renderSales();
+}
+
+function clearWeek(){
+  if(!confirm("Clear all saved weekly sales?"))return;
+  sales=[];
+  localStorage.setItem("acsSalesDetailed",JSON.stringify(sales));
+  renderSales();
+}
+
+function renderSales(){
+  const salesDiv=document.getElementById("sales");
+  const weekly=sales.reduce((sum,s)=>sum+s.total,0);
+  const units=sales.reduce((sum,s)=>sum+(s.units||0),0);
+  const high=sales.length?Math.max(...sales.map(s=>s.total)):0;
+  const avg=sales.length?weekly/sales.length:0;
+
+  document.getElementById("weekly").textContent="$"+weekly.toFixed(2);
+  document.getElementById("salesCount").textContent=sales.length;
+  document.getElementById("unitsCount").textContent=units;
+  document.getElementById("avgSale").textContent="$"+avg.toFixed(2);
+  document.getElementById("highSale").textContent="$"+high.toFixed(2);
+
+  if(sales.length===0){
+    salesDiv.innerHTML='<div class="empty">No saved sales yet. Build a sale above and tap Save Sale.</div>';
+    return;
+  }
+
+  salesDiv.innerHTML="";
+  sales.forEach((sale,index)=>{
+    const detail=sale.items.map(item=>`${item.name} × ${item.qty} = $${item.subtotal.toFixed(2)}`).join("<br>");
+    const div=document.createElement("div");
+    div.className="sale";
+    div.innerHTML=`
+      <div class="saleHead">
+        <div>
+          <b>Sale ${sales.length-index}</b><br>
+          <span>${sale.date}</span><br>
+          <span>${sale.units||0} unit(s)</span>
+        </div>
+        <div class="saleTotal">$${sale.total.toFixed(2)}</div>
+      </div>
+      <div class="saleDetails">${detail}</div>
+      <button class="delete" onclick="deleteSale(${index})">Delete Sale</button>
+    `;
+    salesDiv.appendChild(div);
+  });
+
+  const clear=document.createElement("button");
+  clear.className="action secondary";
+  clear.style.margin="12px";
+  clear.textContent="Clear Week";
+  clear.onclick=clearWeek;
+  salesDiv.appendChild(clear);
+}
+
+updateCurrent();
+renderSales();
+</script>
+</body>
+</html>
